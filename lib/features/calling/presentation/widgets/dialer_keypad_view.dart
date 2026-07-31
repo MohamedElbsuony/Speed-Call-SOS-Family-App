@@ -432,11 +432,14 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 18.0),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _buildRow(['1', '2', '3'], speedState, theme),
+                          const SizedBox(height: 6),
                           _buildRow(['4', '5', '6'], speedState, theme),
+                          const SizedBox(height: 6),
                           _buildRow(['7', '8', '9'], speedState, theme),
+                          const SizedBox(height: 6),
                           _buildRow(['*', '0', '#'], speedState, theme),
                         ],
                       ),
@@ -449,7 +452,7 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
                     child: Row(
                       children: [
                         // Left alignment balance spacer
-                        const SizedBox(width: 44),
+                        const SizedBox(width: 50),
 
                         // Premium SIM 1 Call Button (Emerald Gradient)
                         _buildSimCallButton(
@@ -483,23 +486,23 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
 
                         const SizedBox(width: 10),
 
-                        // Backspace Clear Button
+                        // Backspace Clear Button (Enlarged)
                         SizedBox(
-                          width: 44,
-                          height: 44,
+                          width: 50,
+                          height: 50,
                           child: _inputBuffer.isNotEmpty
                               ? InkWell(
                                   onTap: _onBackspace,
                                   onLongPress: _clearInputBuffer,
-                                  borderRadius: BorderRadius.circular(22),
+                                  borderRadius: BorderRadius.circular(25),
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: theme.colorScheme.errorContainer.withValues(alpha: 0.2),
+                                      color: theme.colorScheme.errorContainer.withValues(alpha: 0.25),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      Icons.backspace_outlined,
-                                      size: 20,
+                                      Icons.backspace_rounded,
+                                      size: 26,
                                       color: theme.colorScheme.error,
                                     ),
                                   ),
@@ -659,7 +662,7 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
         splashColor: theme.colorScheme.primary.withValues(alpha: 0.18),
         highlightColor: theme.colorScheme.primary.withValues(alpha: 0.08),
         child: Container(
-          height: 64,
+          height: 72,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),

@@ -65,6 +65,11 @@ class MainActivity : FlutterActivity() {
             intentAction == "com.example.speed_call_app.ACTION_TRIGGER_SOS" ||
             intentAction == FamilySosWidgetProvider.ACTION_TRIGGER_SOS) {
             pendingInitialAction = "trigger_family_sos"
+            intent?.removeExtra("action")
+            if (intent?.action == "com.example.speed_call_app.ACTION_TRIGGER_SOS" ||
+                intent?.action == FamilySosWidgetProvider.ACTION_TRIGGER_SOS) {
+                intent?.action = Intent.ACTION_MAIN
+            }
         }
     }
 
@@ -131,6 +136,11 @@ class MainActivity : FlutterActivity() {
                 "getInitialAction" -> {
                     val action = pendingInitialAction ?: intent?.getStringExtra("action") ?: ""
                     pendingInitialAction = null
+                    intent?.removeExtra("action")
+                    if (intent?.action == "com.example.speed_call_app.ACTION_TRIGGER_SOS" ||
+                        intent?.action == FamilySosWidgetProvider.ACTION_TRIGGER_SOS) {
+                        intent?.action = Intent.ACTION_MAIN
+                    }
                     result.success(action)
                 }
                 else -> result.notImplemented()
