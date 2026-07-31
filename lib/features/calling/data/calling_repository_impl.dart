@@ -28,16 +28,35 @@ class CallingRepositoryImpl implements CallingRepository {
       subscriptionId: subscriptionId,
     );
 
-    final log = CallLogModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      contactName: contactName,
-      phoneNumber: phoneNumber,
-      simSlotUsed: simSelectionMode,
-      timestamp: DateTime.now(),
-      wasSuccessful: success,
-    );
+    // ONLY record in call history if the call was actually placed successfully
+    if (success) {
+      final bool isRecentDuplicate = _box.values.any((item) {
+        try {
+          final map = Map<String, dynamic>.from(item);
+          final phone = map['phoneNumber'] as String?;
+          final timeStr = map['timestamp'] as String?;
+          if (phone == phoneNumber && timeStr != null) {
+            final logTime = DateTime.parse(timeStr);
+            return DateTime.now().difference(logTime).inSeconds < 5;
+          }
+        } catch (_) {}
+        return false;
+      });
 
-    await _box.put(log.id, log.toMap());
+      if (!isRecentDuplicate) {
+        final log = CallLogModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          contactName: contactName,
+          phoneNumber: phoneNumber,
+          simSlotUsed: simSelectionMode,
+          timestamp: DateTime.now(),
+          wasSuccessful: true,
+        );
+
+        await _box.put(log.id, log.toMap());
+      }
+    }
+
     return success;
   }
 

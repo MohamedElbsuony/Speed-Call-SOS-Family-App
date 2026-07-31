@@ -24,8 +24,10 @@ class DialerKeypadView extends StatefulWidget {
 }
 
 class _DialerKeypadViewState extends State<DialerKeypadView> {
-  String _inputBuffer = '';
+  final TextEditingController _phoneController = TextEditingController();
   List<SimCardInfo> _availableSims = [];
+
+  String get _inputBuffer => _phoneController.text;
 
   final Map<int, String> _subtextMap = {
     1: 'oo',
@@ -43,7 +45,16 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
   @override
   void initState() {
     super.initState();
+    _phoneController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadSimCardsInfo();
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSimCardsInfo() async {
@@ -71,27 +82,46 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
 
   void _onKeyPress(String val) {
     _playKeySound(val);
-    setState(() {
-      _inputBuffer += val;
-    });
+    final text = _phoneController.text;
+    final selection = _phoneController.selection;
+
+    int start = selection.start >= 0 ? selection.start : text.length;
+    int end = selection.end >= 0 ? selection.end : text.length;
+
+    final newText = text.replaceRange(start, end, val);
+    final newIndex = start + val.length;
+
+    _phoneController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newIndex),
+    );
   }
 
   void _onBackspace() {
     _playKeySound('*');
-    if (_inputBuffer.isNotEmpty) {
-      setState(() {
-        _inputBuffer = _inputBuffer.substring(0, _inputBuffer.length - 1);
-      });
+    final text = _phoneController.text;
+    if (text.isEmpty) return;
+
+    final selection = _phoneController.selection;
+    int start = selection.start >= 0 ? selection.start : text.length;
+    int end = selection.end >= 0 ? selection.end : text.length;
+
+    if (start == end && start > 0) {
+      start = start - 1;
+    }
+
+    if (start < end) {
+      final newText = text.replaceRange(start, end, '');
+      _phoneController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: start),
+      );
     }
   }
 
   void _clearInputBuffer() {
     _playKeySound('#');
-    if (_inputBuffer.isNotEmpty) {
-      setState(() {
-        _inputBuffer = '';
-      });
-    }
+    _phoneController.clear();
   }
 
   void _saveTypedNumberAsNewContact() async {
@@ -263,7 +293,7 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
       child: BlocBuilder<ContactsBloc, ContactsState>(
         builder: (context, contactsState) {
           List<ContactModel> t9Matches = [];
-          if (_inputBuffer.isNotEmpty && contactsState is ContactsLoadedState) {
+          if (_inputBuffer.length >= 4 && contactsState is ContactsLoadedState) {
             t9Matches = T9SearchHelper.filterContactsByT9(contactsState.contacts, _inputBuffer);
           }
 
@@ -280,100 +310,119 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          reverse: true,
-                          child: Text(
-                            _inputBuffer.isEmpty ? ' ' : _inputBuffer,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          alignment: Alignment.center,
+                          child: TextField(
+                            controller: _phoneController,
+                            readOnly: true,
+                            showCursor: true,
+                            enableInteractiveSelection: true,
+                            textAlign: TextAlign.center,
                             style: theme.textTheme.headlineLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               letterSpacing: 2,
                               color: theme.colorScheme.primary,
                             ),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
 
-                        // Sleek Action Bar for Typed Number
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: _inputBuffer.isNotEmpty
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.person_add_rounded, size: 18),
-                                        tooltip: 'حفظ كجهة اتصال',
-                                        onPressed: _saveTypedNumberAsNewContact,
+                        // Sleek Action Bar for Typed Number (Fixed Height Container)
+                        SizedBox(
+                          height: 40,
+                          child: Center(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: _inputBuffer.isNotEmpty
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
-                                      const SizedBox(width: 4),
-                                      IconButton(
-                                        icon: const Icon(Icons.touch_app_rounded, size: 18),
-                                        tooltip: 'تعيين لاتصال سريع',
-                                        onPressed: _assignTypedNumberToSpeedDial,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.person_add_rounded, size: 18),
+                                            tooltip: 'حفظ كجهة اتصال',
+                                            onPressed: _saveTypedNumberAsNewContact,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            icon: const Icon(Icons.touch_app_rounded, size: 18),
+                                            tooltip: 'تعيين لاتصال سريع',
+                                            onPressed: _assignTypedNumberToSpeedDial,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            icon: const Icon(Icons.widgets_rounded, size: 18),
+                                            tooltip: 'إنشاء ودجت',
+                                            onPressed: _createWidgetForTypedNumber,
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 4),
-                                      IconButton(
-                                        icon: const Icon(Icons.widgets_rounded, size: 18),
-                                        tooltip: 'إنشاء ودجت',
-                                        onPressed: _createWidgetForTypedNumber,
+                                    )
+                                  : Text(
+                                      'Hold 1-9 for Direct Speed Call',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.w500,
                                       ),
-                                    ],
-                                  ),
-                                )
-                              : Text(
-                                  'Hold 1-9 for Direct Speed Call',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                                    ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  // T9 Smart Search Results Carousel
-                  if (t9Matches.isNotEmpty)
-                    Container(
-                      height: 50,
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: t9Matches.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final contact = t9Matches[index];
-                          final phone = contact.phones.isNotEmpty ? contact.phones.first.number : '';
+                  // T9 Smart Search Results Carousel (Fixed Reserved Height)
+                  SizedBox(
+                    height: 50,
+                    child: t9Matches.isNotEmpty
+                        ? Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: t9Matches.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final contact = t9Matches[index];
+                                final phone = contact.phones.isNotEmpty ? contact.phones.first.number : '';
 
-                          return ActionChip(
-                            avatar: CircleAvatar(
-                              backgroundColor: theme.colorScheme.primary,
-                              child: Text(
-                                contact.displayName.isNotEmpty ? contact.displayName[0] : '?',
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                            ),
-                            label: Text('${contact.displayName} ($phone)'),
-                            onPressed: () {
-                              _playKeySound('0');
-                              context.read<CallingBloc>().add(
-                                    TriggerDirectCallEvent(
-                                      phoneNumber: phone,
-                                      contactName: contact.displayName,
+                                return ActionChip(
+                                  avatar: CircleAvatar(
+                                    backgroundColor: theme.colorScheme.primary,
+                                    child: Text(
+                                      contact.displayName.isNotEmpty ? contact.displayName[0] : '?',
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
                                     ),
-                                  );
-                            },
-                          );
-                        },
-                      ),
-                    ),
+                                  ),
+                                  label: Text('${contact.displayName} ($phone)'),
+                                  onPressed: () {
+                                    _playKeySound('0');
+                                    context.read<CallingBloc>().add(
+                                          TriggerDirectCallEvent(
+                                            phoneNumber: phone,
+                                            contactName: contact.displayName,
+                                          ),
+                                        );
+                                  },
+                                );
+                              },
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
 
                   const Divider(height: 1, indent: 24, endIndent: 24),
                   const SizedBox(height: 8),
@@ -381,7 +430,7 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
                   // Keypad Grid - Strictly LTR
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 18.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
@@ -571,15 +620,20 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
         final digitInt = int.tryParse(keyStr);
         final speedKey = digitInt != null ? speedState.speedDialKeys[digitInt] : null;
 
-        return _buildDialKey(
-          keyStr: keyStr,
-          subtext: digitInt != null ? _subtextMap[digitInt] : null,
-          assignedContact: speedKey?.contactName,
-          onTap: () => _onKeyPress(keyStr),
-          onLongPress: digitInt != null && digitInt >= 1 && digitInt <= 9
-              ? () => _onLongPressDigit(digitInt)
-              : null,
-          theme: theme,
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 5.0),
+            child: _buildDialKey(
+              keyStr: keyStr,
+              subtext: digitInt != null ? _subtextMap[digitInt] : null,
+              assignedContact: speedKey?.contactName,
+              onTap: () => _onKeyPress(keyStr),
+              onLongPress: digitInt != null && digitInt >= 1 && digitInt <= 9
+                  ? () => _onLongPressDigit(digitInt)
+                  : null,
+              theme: theme,
+            ),
+          ),
         );
       }).toList(),
     );
@@ -593,54 +647,81 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
     VoidCallback? onLongPress,
     required ThemeData theme,
   }) {
-    return InkWell(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      borderRadius: BorderRadius.circular(40),
-      child: Container(
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHigh,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+    final bool hasAssignedContact = assignedContact != null && assignedContact.isNotEmpty;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(20),
+        splashColor: theme.colorScheme.primary.withValues(alpha: 0.18),
+        highlightColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),
+            border: Border.all(
+              color: hasAssignedContact
+                  ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 1.4,
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              keyStr,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                height: 1.0,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
               ),
-            ),
-            if (assignedContact != null && assignedContact.isNotEmpty)
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               Text(
-                assignedContact,
-                style: TextStyle(
-                  fontSize: 9,
+                keyStr,
+                style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )
-            else if (subtext != null)
-              Text(
-                subtext,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 26,
+                  height: 1.0,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
-          ],
+              if (hasAssignedContact) ...[
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    assignedContact,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ] else if (subtext != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtext,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../widgets/sim_selection_sheet.dart';
+
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/widgets/empty_state_view.dart';
 import '../../domain/models/call_log_model.dart';
@@ -109,14 +111,19 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                         ),
                         trailing: IconButton(
                           icon: Icon(Icons.call_rounded, color: theme.colorScheme.primary),
-                          onPressed: () {
-                            context.read<CallingBloc>().add(
-                                  TriggerDirectCallEvent(
-                                    phoneNumber: log.phoneNumber,
-                                    contactName: log.contactName,
-                                    simSelectionMode: log.simSlotUsed,
-                                  ),
-                                );
+                          onPressed: () async {
+                            final simMode = await SimSelectionSheet.show(context);
+                            if (simMode == null) return;
+
+                            if (context.mounted) {
+                              context.read<CallingBloc>().add(
+                                    TriggerDirectCallEvent(
+                                      phoneNumber: log.phoneNumber,
+                                      contactName: log.contactName,
+                                      simSelectionMode: simMode,
+                                    ),
+                                  );
+                            }
                           },
                         ),
                       );

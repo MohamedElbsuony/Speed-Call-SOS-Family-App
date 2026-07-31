@@ -39,14 +39,32 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private var pendingInitialAction: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         directCallManager = DirectCallManager(this)
         simManager = SimManager(this)
+        checkIntentForSosAction(intent)
         try {
             toneGenerator = ToneGenerator(AudioManager.STREAM_SYSTEM, 85)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        checkIntentForSosAction(intent)
+    }
+
+    private fun checkIntentForSosAction(intent: Intent?) {
+        val actionStr = intent?.getStringExtra("action")
+        val intentAction = intent?.action
+        if (actionStr == "trigger_family_sos" ||
+            intentAction == "com.example.speed_call_app.ACTION_TRIGGER_SOS" ||
+            intentAction == FamilySosWidgetProvider.ACTION_TRIGGER_SOS) {
+            pendingInitialAction = "trigger_family_sos"
         }
     }
 
@@ -111,7 +129,8 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "getInitialAction" -> {
-                    val action = intent?.getStringExtra("action") ?: ""
+                    val action = pendingInitialAction ?: intent?.getStringExtra("action") ?: ""
+                    pendingInitialAction = null
                     result.success(action)
                 }
                 else -> result.notImplemented()
