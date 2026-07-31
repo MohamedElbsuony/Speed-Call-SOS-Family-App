@@ -25,6 +25,20 @@ class MainActivity : FlutterActivity() {
     private lateinit var simManager: SimManager
     private var toneGenerator: ToneGenerator? = null
 
+    private var pendingGpsResult: MethodChannel.Result? = null
+    private val REQUEST_CODE_LOCATION_SETTINGS = 1099
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CODE_LOCATION_SETTINGS) {
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            val isGpsEnabled = locationManager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
+                               locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
+            pendingGpsResult?.success(isGpsEnabled)
+            pendingGpsResult = null
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         directCallManager = DirectCallManager(this)
@@ -53,6 +67,26 @@ class MainActivity : FlutterActivity() {
                     val digit = call.argument<String>("digit") ?: ""
                     playDtmf(digit)
                     result.success(true)
+                }
+                "getGpsLocation" -> {
+                    getFreshGpsLocation(result)
+                }
+                "checkAndEnableGps" -> {
+                    val locationManager = getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+                    val isGpsEnabled = locationManager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
+                                       locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
+                    if (!isGpsEnabled) {
+                        pendingGpsResult = result
+                        try {
+                            val intent = Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                            startActivityForResult(intent, REQUEST_CODE_LOCATION_SETTINGS)
+                        } catch (e: Exception) {
+                            result.success(false)
+                            pendingGpsResult = null
+                        }
+                    } else {
+                        result.success(true)
+                    }
                 }
                 "insertContact" -> {
                     val number = call.argument<String>("phoneNumber") ?: ""
@@ -262,5 +296,87 @@ class MainActivity : FlutterActivity() {
             }
         }
         return false
+    }
+
+    private fun getFreshGpsLocation(result: io.flutter.plugin.common.MethodChannel.Result) {
+        try {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                result.success("")
+                return
+            }
+
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            if (locationManager == null) {
+                result.success("")
+                return
+            }
+
+            var bestLoc: android.location.Location? = null
+            val providers = locationManager.getProviders(true)
+            for (provider in providers) {
+                val l = locationManager.getLastKnownLocation(provider) ?: continue
+                if (bestLoc == null || l.time > bestLoc.time) {
+                    bestLoc = l
+                }
+            }
+
+            if (bestLoc != null && (System.currentTimeMillis() - bestLoc.time) < 60000) {
+                result.success("${bestLoc.latitude},${bestLoc.longitude}")
+                return
+            }
+
+            var hasResponded = false
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(loc: android.location.Location) {
+                    if (!hasResponded) {
+                        hasResponded = true
+                        try { locationManager.removeUpdates(this) } catch (_: Exception) {}
+                        result.success("${loc.latitude},${loc.longitude}")
+                    }
+                }
+                override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }
+
+            var requested = false
+            if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                try {
+                    locationManager.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER, 0L, 0f, listener, mainLooper)
+                    requested = true
+                } catch (_: Exception) {}
+            }
+            if (locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                try {
+                    locationManager.requestLocationUpdates(android.location.LocationManager.NETWORK_PROVIDER, 0L, 0f, listener, mainLooper)
+                    requested = true
+                } catch (_: Exception) {}
+            }
+
+            if (!requested) {
+                if (bestLoc != null) {
+                    result.success("${bestLoc.latitude},${bestLoc.longitude}")
+                } else {
+                    result.success("")
+                }
+                return
+            }
+
+            android.os.Handler(mainLooper).postDelayed({
+                if (!hasResponded) {
+                    hasResponded = true
+                    try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
+                    if (bestLoc != null) {
+                        result.success("${bestLoc.latitude},${bestLoc.longitude}")
+                    } else {
+                        result.success("")
+                    }
+                }
+            }, 3000)
+
+        } catch (e: Exception) {
+            result.success("")
+        }
     }
 }

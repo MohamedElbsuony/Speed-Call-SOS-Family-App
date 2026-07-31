@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:permission_handler/permission_handler.dart';
+
 import '../../../../core/localization/app_localizations.dart';
 import '../../../calling/presentation/bloc/family_sos_bloc.dart';
 import '../../../calling/presentation/screens/call_history_screen.dart';
@@ -23,7 +25,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _requestAllAppPermissions();
     _checkInitialSosAction();
+  }
+
+  Future<void> _requestAllAppPermissions() async {
+    try {
+      await [
+        Permission.contacts,
+        Permission.phone,
+        Permission.sms,
+        Permission.location,
+        Permission.notification,
+      ].request();
+    } catch (_) {}
   }
 
   Future<void> _checkInitialSosAction() async {

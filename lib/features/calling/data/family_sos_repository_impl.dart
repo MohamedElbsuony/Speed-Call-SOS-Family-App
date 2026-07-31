@@ -3,10 +3,30 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:permission_handler/permission_handler.dart';
+
 import '../../../core/local_storage/hive_storage.dart';
 import '../../../core/native/direct_call_platform.dart';
 import '../domain/models/family_sos_config_model.dart';
 import '../domain/repositories/family_sos_repository.dart';
+
+class EmergencyContactEntry {
+  final String name;
+  final String phone;
+
+  EmergencyContactEntry({required this.name, required this.phone});
+
+  factory EmergencyContactEntry.parse(String raw) {
+    if (raw.contains('|')) {
+      final parts = raw.split('|');
+      return EmergencyContactEntry(
+        name: parts[0].trim(),
+        phone: parts.sublist(1).join('|').trim(),
+      );
+    }
+    return EmergencyContactEntry(name: raw.trim(), phone: raw.trim());
+  }
+}
 
 class FamilySosRepositoryImpl implements FamilySosRepository {
   final Box<Map<dynamic, dynamic>> _box = HiveStorage.familySosBox;
@@ -56,32 +76,68 @@ class FamilySosRepositoryImpl implements FamilySosRepository {
 
     String crisisMessage = config.sosMessageText;
     if (config.includeLocation) {
-      crisisMessage += '\n\n📍 موقع الطوارئ المباشر:\nhttps://maps.google.com/?q=EmergencyAlertLocation';
+      try {
+        var status = await Permission.location.status;
+        if (!status.isGranted) {
+          status = await Permission.location.request();
+        }
+
+        const directChannel = MethodChannel('com.speedcall.app/direct_call');
+        await directChannel.invokeMethod<bool>('checkAndEnableGps');
+
+        final String? gpsCoords = await directChannel.invokeMethod<String>('getGpsLocation');
+        if (gpsCoords != null && gpsCoords.isNotEmpty) {
+          crisisMessage += '\n\n📍 موقع الطوارئ المباشر (GPS):\nhttps://www.google.com/maps/search/?api=1&query=$gpsCoords';
+        } else {
+          crisisMessage += '\n\n📍 موقع الطوارئ المباشر:\nhttps://maps.google.com';
+        }
+      } catch (_) {
+        crisisMessage += '\n\n📍 موقع الطوارئ المباشر:\nhttps://maps.google.com';
+      }
     }
 
-    // Mode 0: Voice Call Only (Default)
+    final entries = config.emergencyContacts.map((raw) => EmergencyContactEntry.parse(raw)).toList();
+
+    // Mode 0: Voice Call Only
     if (mode == 0) {
       if (config.primaryCallNumber.isNotEmpty) {
         await DirectCallPlatform.makeCall(
           phoneNumber: config.primaryCallNumber,
           simSelectionMode: 0,
         );
-      } else if (config.emergencyContacts.isNotEmpty) {
+      } else if (entries.isNotEmpty) {
         await DirectCallPlatform.makeCall(
-          phoneNumber: config.emergencyContacts.first,
+          phoneNumber: entries.first.phone,
           simSelectionMode: 0,
         );
       }
       return;
     }
 
-    // Mode 1: WhatsApp Message Only
+    // Mode 1: WhatsApp Alert (Guaranteed Hybrid Delivery)
+    // Send instant background SMS to ALL emergency numbers so everyone receives the crisis alert immediately,
+    // AND launch WhatsApp for primary contact with the pre-filled message!
     if (mode == 1) {
-      for (String phone in config.emergencyContacts) {
-        final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '').replaceAll('+', '');
+      for (var entry in entries) {
+        final cleanPhone = entry.phone.replaceAll(RegExp(r'[^0-9+]'), '');
         if (cleanPhone.isEmpty) continue;
 
-        final whatsappUrl = Uri.parse("https://wa.me/$cleanPhone?text=${Uri.encodeComponent(crisisMessage)}");
+        try {
+          await _smsChannel.invokeMethod('sendDirectSms', {
+            'phoneNumber': cleanPhone,
+            'message': crisisMessage,
+          });
+        } catch (_) {}
+      }
+
+      String targetPhone = config.primaryCallNumber;
+      if (targetPhone.isEmpty && entries.isNotEmpty) {
+        targetPhone = entries.first.phone;
+      }
+
+      final cleanWaPhone = targetPhone.replaceAll(RegExp(r'[^0-9+]'), '').replaceAll('+', '');
+      if (cleanWaPhone.isNotEmpty) {
+        final whatsappUrl = Uri.parse("https://wa.me/$cleanWaPhone?text=${Uri.encodeComponent(crisisMessage)}");
         try {
           if (await canLaunchUrl(whatsappUrl)) {
             await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
@@ -93,8 +149,8 @@ class FamilySosRepositoryImpl implements FamilySosRepository {
 
     // Mode 2: Offline Direct SMS Only
     if (mode == 2) {
-      for (String phone in config.emergencyContacts) {
-        final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+      for (var entry in entries) {
+        final cleanPhone = entry.phone.replaceAll(RegExp(r'[^0-9+]'), '');
         if (cleanPhone.isEmpty) continue;
 
         try {
