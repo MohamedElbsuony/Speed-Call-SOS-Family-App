@@ -62,7 +62,8 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
   }
 
   void _pickEmergencyNumberFromContacts() async {
-    final result = await context.push<Map<String, dynamic>>('/contacts?select=true');
+    final result =
+        await context.push<Map<String, dynamic>>('/contacts?select=true');
     if (result != null && mounted) {
       final ContactModel contact = result['contact'] as ContactModel;
       final PhoneEntry phone = result['phone'] as PhoneEntry;
@@ -71,12 +72,17 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
 
       if (fullPhone.isNotEmpty) {
         final item = EmergencyContactItem(name: displayName, phone: fullPhone);
-        final newList = List<String>.from(_config.emergencyContacts)..add(item.toRaw());
+        final newList = List<String>.from(_config.emergencyContacts)
+          ..add(item.toRaw());
         setState(() {
           _config = _config.copyWith(
             emergencyContacts: newList,
-            primaryCallNumber: _config.primaryCallNumber.isEmpty ? fullPhone : _config.primaryCallNumber,
-            primaryCallName: _config.primaryCallName.isEmpty ? displayName : _config.primaryCallName,
+            primaryCallNumber: _config.primaryCallNumber.isEmpty
+                ? fullPhone
+                : _config.primaryCallNumber,
+            primaryCallName: _config.primaryCallName.isEmpty
+                ? displayName
+                : _config.primaryCallName,
           );
         });
         _saveConfig();
@@ -108,7 +114,8 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                   _pickEmergencyNumberFromContacts();
                 },
                 icon: const Icon(Icons.contacts_rounded, color: Colors.blue),
-                label: Text(loc.get('pick_from_contacts_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                label: Text(loc.get('pick_from_contacts_btn'),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 16),
               Row(
@@ -116,7 +123,9 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                   const Expanded(child: Divider()),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text(loc.get('or_type_manually'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    child: Text(loc.get('or_type_manually'),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey)),
                   ),
                   const Expanded(child: Divider()),
                 ],
@@ -176,13 +185,19 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
               if (number.isNotEmpty) {
                 final fullPhone = '$code$number';
                 final displayName = name.isNotEmpty ? name : fullPhone;
-                final item = EmergencyContactItem(name: displayName, phone: fullPhone);
-                final newList = List<String>.from(_config.emergencyContacts)..add(item.toRaw());
+                final item =
+                    EmergencyContactItem(name: displayName, phone: fullPhone);
+                final newList = List<String>.from(_config.emergencyContacts)
+                  ..add(item.toRaw());
                 setState(() {
                   _config = _config.copyWith(
                     emergencyContacts: newList,
-                    primaryCallNumber: _config.primaryCallNumber.isEmpty ? fullPhone : _config.primaryCallNumber,
-                    primaryCallName: _config.primaryCallName.isEmpty ? displayName : _config.primaryCallName,
+                    primaryCallNumber: _config.primaryCallNumber.isEmpty
+                        ? fullPhone
+                        : _config.primaryCallNumber,
+                    primaryCallName: _config.primaryCallName.isEmpty
+                        ? displayName
+                        : _config.primaryCallName,
                   );
                 });
                 _saveConfig();
@@ -202,7 +217,9 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
 
   void _selectPrimaryCallContact() {
     final loc = AppLocalizations.of(context);
-    final parsedList = _config.emergencyContacts.map((raw) => EmergencyContactItem.fromRaw(raw)).toList();
+    final parsedList = _config.emergencyContacts
+        .map((raw) => EmergencyContactItem.fromRaw(raw))
+        .toList();
 
     if (parsedList.isEmpty) {
       showDialog(
@@ -237,7 +254,8 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
 
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -247,7 +265,8 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Text(
                 loc.get('select_primary_modal_title'),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
             const Divider(),
@@ -261,15 +280,20 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
 
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: isSelected ? Colors.red : Colors.grey.shade200,
+                      backgroundColor:
+                          isSelected ? Colors.red : Colors.grey.shade200,
                       child: Icon(
                         Icons.call_rounded,
                         color: isSelected ? Colors.white : Colors.black87,
                       ),
                     ),
-                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(item.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(item.phone),
-                    trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: Colors.red) : null,
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle_rounded,
+                            color: Colors.red)
+                        : null,
                     onTap: () {
                       Navigator.of(ctx).pop();
                       setState(() {
@@ -308,7 +332,9 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final emergencyItems = _config.emergencyContacts.map((raw) => EmergencyContactItem.fromRaw(raw)).toList();
+    final emergencyItems = _config.emergencyContacts
+        .map((raw) => EmergencyContactItem.fromRaw(raw))
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -329,9 +355,12 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
               children: [
                 // Master Enable Card
                 Card(
-                  color: _config.isEnabled ? theme.colorScheme.errorContainer.withValues(alpha: 0.3) : null,
+                  color: _config.isEnabled
+                      ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
+                      : null,
                   child: SwitchListTile(
-                    title: Text(loc.get('enable_family_sos'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(loc.get('enable_family_sos'),
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(loc.get('enable_family_sos_sub')),
                     value: _config.isEnabled,
                     onChanged: (val) {
@@ -353,7 +382,9 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                       RadioListTile<int>(
                         value: 0,
                         groupValue: _config.sosActionMode,
-                        title: Text(loc.get('mode_call_only'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(loc.get('mode_call_only'),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(loc.get('mode_call_only_sub')),
                         onChanged: (val) {
                           if (val != null) {
@@ -367,7 +398,9 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                       RadioListTile<int>(
                         value: 1,
                         groupValue: _config.sosActionMode,
-                        title: Text(loc.get('mode_wa_only'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(loc.get('mode_wa_only'),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(loc.get('mode_wa_only_sub')),
                         onChanged: (val) {
                           if (val != null) {
@@ -381,7 +414,9 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                       RadioListTile<int>(
                         value: 2,
                         groupValue: _config.sosActionMode,
-                        title: Text(loc.get('mode_sms_only'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(loc.get('mode_sms_only'),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(loc.get('mode_sms_only_sub')),
                         onChanged: (val) {
                           if (val != null) {
@@ -428,7 +463,8 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildSectionHeader(theme, '${loc.get('emergency_contacts_count')} (${emergencyItems.length})'),
+                    _buildSectionHeader(theme,
+                        '${loc.get('emergency_contacts_count')} (${emergencyItems.length})'),
                     IconButton.filledTonal(
                       icon: const Icon(Icons.add_rounded),
                       onPressed: _addEmergencyNumber,
@@ -440,7 +476,8 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Center(child: Text(loc.get('no_emergency_contacts'))),
+                      child:
+                          Center(child: Text(loc.get('no_emergency_contacts'))),
                     ),
                   )
                 else
@@ -451,18 +488,29 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                           leading: CircleAvatar(
                             backgroundColor: Colors.green.shade100,
                             child: Text(
-                              item.name.isNotEmpty ? item.name[0].toUpperCase() : '?',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                              item.name.isNotEmpty
+                                  ? item.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green),
                             ),
                           ),
-                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('${item.phone} • ${loc.get('receives_sos_alerts')}'),
+                          title: Text(item.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(
+                              '${item.phone} • ${loc.get('receives_sos_alerts')}'),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                color: Colors.red),
                             onPressed: () {
-                              final newList = List<String>.from(_config.emergencyContacts)..remove(item.toRaw());
+                              final newList =
+                                  List<String>.from(_config.emergencyContacts)
+                                    ..remove(item.toRaw());
                               setState(() {
-                                _config = _config.copyWith(emergencyContacts: newList);
+                                _config = _config.copyWith(
+                                    emergencyContacts: newList);
                               });
                               _saveConfig();
                             },
@@ -499,10 +547,13 @@ class _FamilySosConfigScreenState extends State<FamilySosConfigScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   onPressed: () {
-                    context.read<FamilySosBloc>().add(PinFamilySosWidgetEvent());
+                    context
+                        .read<FamilySosBloc>()
+                        .add(PinFamilySosWidgetEvent());
                   },
                   icon: const Icon(Icons.add_to_home_screen_rounded),
-                  label: Text(loc.get('pin_sos_widget_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(loc.get('pin_sos_widget_btn'),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

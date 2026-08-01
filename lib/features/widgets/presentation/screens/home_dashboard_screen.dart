@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/localization/app_localizations.dart';
@@ -10,6 +9,8 @@ import '../../../calling/presentation/bloc/family_sos_bloc.dart';
 import '../../../calling/presentation/screens/call_history_screen.dart';
 import '../../../calling/presentation/widgets/dialer_keypad_view.dart';
 import '../../../calling/presentation/widgets/sos_trigger_dialog.dart';
+import '../../../contacts/presentation/bloc/contacts_bloc.dart';
+import '../../../contacts/presentation/screens/contacts_screen.dart';
 import '../../../contacts/presentation/screens/favorites_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
@@ -19,7 +20,8 @@ class HomeDashboardScreen extends StatefulWidget {
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
 }
 
-class _HomeDashboardScreenState extends State<HomeDashboardScreen> with WidgetsBindingObserver {
+class _HomeDashboardScreenState extends State<HomeDashboardScreen>
+    with WidgetsBindingObserver {
   int _selectedBottomIndex = 0; // Keypad is Tab 0 (Primary Default Screen)
 
   @override
@@ -40,6 +42,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with WidgetsB
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkInitialSosAction();
+      context
+          .read<ContactsBloc>()
+          .add(const LoadContactsEvent(forceRefresh: true));
     }
   }
 
@@ -58,7 +63,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with WidgetsB
   Future<void> _checkInitialSosAction() async {
     try {
       const channel = MethodChannel('com.speedcall.app/direct_call');
-      final String? action = await channel.invokeMethod<String>('getInitialAction');
+      final String? action =
+          await channel.invokeMethod<String>('getInitialAction');
       if (action == 'trigger_family_sos' && mounted) {
         SosTriggerDialog.show(context);
       }
@@ -72,60 +78,123 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with WidgetsB
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          loc.get('app_title'),
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.bolt_rounded,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              loc.get('app_title'),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
         ),
         actions: [
           BlocBuilder<FamilySosBloc, FamilySosState>(
             builder: (context, sosState) {
               if (sosState.config.isEnabled) {
-                return IconButton(
-                  icon: const Icon(Icons.sos_rounded, color: Colors.red),
-                  tooltip: 'Family SOS',
-                  onPressed: () => SosTriggerDialog.show(context),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: InkWell(
+                    onTap: () => SosTriggerDialog.show(context),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 16, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text(
+                            'SOS',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 );
               }
               return const SizedBox.shrink();
             },
           ),
           IconButton(
-            icon: const Icon(Icons.contacts_rounded),
-            tooltip: loc.get('contacts'),
-            onPressed: () => context.push('/contacts'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.history_rounded),
-            tooltip: loc.get('call_history'),
-            onPressed: () => context.push('/call-history'),
-          ),
-          IconButton(
-            icon: CircleAvatar(
-              radius: 14,
-              backgroundColor: theme.colorScheme.primary,
-              child: const Text('MS', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-            tooltip: 'Developer Info',
-            onPressed: () => context.push('/about-developer'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
+            icon: const Icon(Icons.settings_rounded, size: 24),
             tooltip: loc.get('settings'),
             onPressed: () => context.push('/settings'),
           ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, size: 24),
+            tooltip: 'المزيد',
+            onSelected: (value) {
+              if (value == 'developer') {
+                context.push('/about-developer');
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'developer',
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 12,
+                      child: Text('MS', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                    SizedBox(width: 10),
+                    Text('معلومات المطور'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: IndexedStack(
         index: _selectedBottomIndex,
-        children: [
-          // Tab 0: Primary Default Screen - Fullscreen Dialer Keypad
-          const DialerKeypadView(),
+        children: const [
+          // Tab 0: Keypad
+          DialerKeypadView(),
 
-          // Tab 1: Recents & Call History
-          const CallHistoryScreen(embedInTab: true),
+          // Tab 1: Contacts (الأسماء)
+          ContactsScreen(embedInTab: true),
 
-          // Tab 2: Favorites Screen (جهات الاتصال المفضلة)
-          const FavoritesScreen(),
+          // Tab 2: Recents & Call History
+          CallHistoryScreen(embedInTab: true),
+
+          // Tab 3: Favorites Screen (جهات الاتصال المفضلة)
+          FavoritesScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -142,6 +211,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with WidgetsB
             label: loc.get('keypad'),
           ),
           NavigationDestination(
+            icon: const Icon(Icons.people_outline_rounded),
+            selectedIcon: const Icon(Icons.people_rounded),
+            label: loc.get('contacts'),
+          ),
+          NavigationDestination(
             icon: const Icon(Icons.history_outlined),
             selectedIcon: const Icon(Icons.history_rounded),
             label: loc.get('call_history'),
@@ -153,7 +227,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with WidgetsB
           ),
         ],
       ),
-      floatingActionButton: _selectedBottomIndex == 2
+      floatingActionButton: _selectedBottomIndex == 3
           ? FloatingActionButton.extended(
               heroTag: 'fab_home_favorites',
               onPressed: () => context.push('/contacts'),

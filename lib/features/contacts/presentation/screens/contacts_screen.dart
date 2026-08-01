@@ -10,10 +10,12 @@ import '../widgets/phone_number_picker_dialog.dart';
 
 class ContactsScreen extends StatefulWidget {
   final bool isSelectingForWidget;
+  final bool embedInTab;
 
   const ContactsScreen({
     super.key,
     this.isSelectingForWidget = false,
+    this.embedInTab = false,
   });
 
   @override
@@ -40,67 +42,78 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final loc = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.isSelectingForWidget ? 'Select Contact for Speed Dial / Favorite' : loc.get('contacts')),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (query) {
-                context.read<ContactsBloc>().add(LoadContactsEvent(query: query));
-              },
-              decoration: InputDecoration(
-                hintText: loc.get('search_contacts'),
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded),
-                        onPressed: () {
-                          _searchController.clear();
-                          context.read<ContactsBloc>().add(const LoadContactsEvent(query: ''));
-                        },
-                      )
-                    : null,
-                filled: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+    final Widget searchBar = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (query) {
+          context.read<ContactsBloc>().add(LoadContactsEvent(query: query));
+        },
+        decoration: InputDecoration(
+          hintText: loc.get('search_contacts'),
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded),
+                  onPressed: () {
+                    _searchController.clear();
+                    context.read<ContactsBloc>().add(const LoadContactsEvent(query: ''));
+                  },
+                )
+              : IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: 'تحديث جهات الاتصال',
+                  onPressed: () {
+                    context.read<ContactsBloc>().add(LoadContactsEvent(query: _searchController.text, forceRefresh: true));
+                  },
                 ),
-              ),
-            ),
+          filled: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide.none,
           ),
         ),
       ),
-      body: BlocBuilder<ContactsBloc, ContactsState>(
+    );
+
+    final Widget contactsListContent = RefreshIndicator(
+      onRefresh: () async {
+        context.read<ContactsBloc>().add(LoadContactsEvent(query: _searchController.text, forceRefresh: true));
+      },
+      child: BlocBuilder<ContactsBloc, ContactsState>(
         builder: (context, state) {
           if (state is ContactsLoadingState) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (state is ContactsErrorState) {
-            return Center(child: Text(state.message));
-          }
-
-          if (state is ContactsLoadedState) {
-            if (state.contacts.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.person_search_rounded, size: 64, color: theme.colorScheme.outline),
-                    const SizedBox(height: 16),
-                    Text('No contacts found', style: theme.textTheme.titleMedium),
-                  ],
-                ),
-              );
+            if (state is ContactsErrorState) {
+              return Center(child: Text(state.message));
             }
 
-            return ListView(
-              padding: const EdgeInsets.only(bottom: 24),
+            if (state is ContactsLoadedState) {
+              if (state.contacts.isEmpty) {
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.person_search_rounded, size: 64, color: theme.colorScheme.outline),
+                          const SizedBox(height: 16),
+                          Text('No contacts found', style: theme.textTheme.titleMedium),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 24),
               children: [
                 if (state.pinned.isNotEmpty && state.searchQuery.isEmpty) ...[
                   Padding(
@@ -147,6 +160,36 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
           return const SizedBox.shrink();
         },
+      ),
+    );
+
+    if (widget.embedInTab) {
+      return Column(
+        children: [
+          searchBar,
+          Expanded(child: contactsListContent),
+        ],
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.isSelectingForWidget ? 'Select Contact for Speed Dial / Favorite' : loc.get('contacts')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'تحديث جهات الاتصال',
+            onPressed: () {
+              context.read<ContactsBloc>().add(LoadContactsEvent(query: _searchController.text, forceRefresh: true));
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          searchBar,
+          Expanded(child: contactsListContent),
+        ],
       ),
     );
   }

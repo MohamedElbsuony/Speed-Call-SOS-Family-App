@@ -427,7 +427,7 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
                   const Divider(height: 1, indent: 24, endIndent: 24),
                   const SizedBox(height: 8),
 
-                  // Keypad Grid - Strictly LTR
+                  // Keypad Grid - Strictly LTR (Balanced Vertical Spacing)
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 18.0),
@@ -448,7 +448,7 @@ class _DialerKeypadViewState extends State<DialerKeypadView> {
 
                   // Bottom Call Controls (Premium Dual SIM Gradient Dock + Backspace)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
                     child: Row(
                       children: [
                         // Left alignment balance spacer

@@ -79,11 +79,14 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
   }
 
   Future<void> _onLoadContacts(LoadContactsEvent event, Emitter<ContactsState> emit) async {
-    if (state is! ContactsLoadedState) {
+    if (state is! ContactsLoadedState && !event.forceRefresh) {
       emit(ContactsLoadingState());
     }
     try {
-      final contacts = await contactsRepository.getContacts(query: event.query);
+      final contacts = await contactsRepository.getContacts(
+        query: event.query,
+        forceRefresh: event.forceRefresh,
+      );
       final favorites = contacts.where((c) => c.isFavorite).toList();
       final pinned = contacts.where((c) => c.isPinned).toList();
 
