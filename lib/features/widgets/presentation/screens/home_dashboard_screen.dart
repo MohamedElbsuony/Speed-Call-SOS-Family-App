@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,8 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/native/direct_call_platform.dart';
+import '../../../calling/presentation/bloc/calling_bloc.dart';
 import '../../../calling/presentation/bloc/family_sos_bloc.dart';
 import '../../../calling/presentation/screens/call_history_screen.dart';
+import '../../../calling/presentation/screens/in_call_screen.dart';
 import '../../../calling/presentation/widgets/dialer_keypad_view.dart';
 import '../../../calling/presentation/widgets/sos_trigger_dialog.dart';
 import '../../../contacts/presentation/bloc/contacts_bloc.dart';
@@ -23,6 +27,8 @@ class HomeDashboardScreen extends StatefulWidget {
 class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     with WidgetsBindingObserver {
   int _selectedBottomIndex = 0; // Keypad is Tab 0 (Primary Default Screen)
+  StreamSubscription<Map<String, dynamic>>? _callStateSub;
+  bool _isInCallScreenOpen = false;
 
   @override
   void initState() {
@@ -30,10 +36,40 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     _requestAllAppPermissions();
     _checkInitialSosAction();
+    _initCallStateListener();
+  }
+
+  void _initCallStateListener() {
+    _callStateSub = DirectCallPlatform.callStateStream.listen((data) {
+      if (!mounted) return;
+      final state = data['state'] as String? ?? '';
+      final phone = data['phoneNumber'] as String? ?? '';
+      final isIncoming = data['isIncoming'] as bool? ?? false;
+
+      if ((state == 'RINGING' || state == 'DIALING' || state == 'ACTIVE') && !_isInCallScreenOpen) {
+        _isInCallScreenOpen = true;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => InCallScreen(
+              phoneNumber: phone,
+              contactName: phone,
+              isIncoming: isIncoming,
+              initialCallState: state,
+            ),
+          ),
+        ).then((_) {
+          _isInCallScreenOpen = false;
+          if (mounted) {
+            context.read<CallingBloc>().add(LoadCallHistoryEvent());
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _callStateSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -45,6 +81,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       context
           .read<ContactsBloc>()
           .add(const LoadContactsEvent(forceRefresh: true));
+      context.read<CallingBloc>().add(LoadCallHistoryEvent());
     }
   }
 
@@ -53,6 +90,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       await [
         Permission.contacts,
         Permission.phone,
+        Permission.microphone,
         Permission.sms,
         Permission.location,
         Permission.notification,

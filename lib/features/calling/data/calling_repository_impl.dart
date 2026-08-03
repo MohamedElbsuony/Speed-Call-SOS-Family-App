@@ -28,40 +28,82 @@ class CallingRepositoryImpl implements CallingRepository {
       subscriptionId: subscriptionId,
     );
 
-    // ONLY record in call history if the call was actually placed successfully
     if (success) {
-      final bool isRecentDuplicate = _box.values.any((item) {
-        try {
-          final map = Map<String, dynamic>.from(item);
-          final phone = map['phoneNumber'] as String?;
-          final timeStr = map['timestamp'] as String?;
-          if (phone == phoneNumber && timeStr != null) {
-            final logTime = DateTime.parse(timeStr);
-            return DateTime.now().difference(logTime).inSeconds < 5;
-          }
-        } catch (_) {}
-        return false;
-      });
-
-      if (!isRecentDuplicate) {
-        final log = CallLogModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          contactName: contactName,
-          phoneNumber: phoneNumber,
-          simSlotUsed: simSelectionMode,
-          timestamp: DateTime.now(),
-          wasSuccessful: true,
-        );
-
-        await _box.put(log.id, log.toMap());
-      }
+      final log = CallLogModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        contactName: contactName,
+        phoneNumber: phoneNumber,
+        simSlotUsed: simSelectionMode,
+        timestamp: DateTime.now(),
+        wasSuccessful: true,
+        callType: CallType.outgoing,
+      );
+      await saveCallLog(log);
     }
 
     return success;
   }
 
   @override
+  Future<void> saveCallLog(CallLogModel log) async {
+    final bool isRecentDuplicate = _box.values.any((item) {
+      try {
+        final map = Map<String, dynamic>.from(item);
+        final phone = map['phoneNumber'] as String?;
+        final timeStr = map['timestamp'] as String?;
+        if (phone == log.phoneNumber && timeStr != null) {
+          final logTime = DateTime.parse(timeStr);
+          return log.timestamp.difference(logTime).inSeconds.abs() < 4;
+        }
+      } catch (_) {}
+      return false;
+    });
+
+    if (!isRecentDuplicate) {
+      await _box.put(log.id, log.toMap());
+    }
+  }
+
+  @override
+  Future<void> syncSystemCallLogs() async {
+    try {
+      final systemLogs = await DirectCallPlatform.getSystemCallLogs();
+      for (final item in systemLogs) {
+        final String id = item['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
+        final String phone = item['phoneNumber']?.toString() ?? '';
+        final String name = item['contactName']?.toString() ?? phone;
+        final String typeStr = item['callType']?.toString() ?? 'incoming';
+        final int timestampMs = item['timestamp'] as int? ?? DateTime.now().millisecondsSinceEpoch;
+        final int durationSeconds = item['durationSeconds'] as int? ?? 0;
+
+        CallType callType = CallType.incoming;
+        if (typeStr == 'outgoing') callType = CallType.outgoing;
+        if (typeStr == 'missed') callType = CallType.missed;
+        if (typeStr == 'rejected') callType = CallType.rejected;
+
+        final log = CallLogModel(
+          id: 'sys_$id',
+          contactName: name.isNotEmpty ? name : phone,
+          phoneNumber: phone,
+          simSlotUsed: 0,
+          timestamp: DateTime.fromMillisecondsSinceEpoch(timestampMs),
+          wasSuccessful: callType != CallType.missed && callType != CallType.rejected,
+          callType: callType,
+          durationSeconds: durationSeconds,
+        );
+
+        if (!_box.containsKey(log.id)) {
+          await _box.put(log.id, log.toMap());
+        }
+      }
+    } catch (e) {
+      print('Error syncing system call logs: $e');
+    }
+  }
+
+  @override
   Future<List<CallLogModel>> getCallHistory() async {
+    await syncSystemCallLogs();
     final List<CallLogModel> logs = [];
     for (var key in _box.keys) {
       final map = _box.get(key);

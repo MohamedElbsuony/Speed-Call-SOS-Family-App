@@ -133,6 +133,55 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "isDefaultDialer" -> {
+                    val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                    val isDefault = telecomManager?.defaultDialerPackage == packageName
+                    result.success(isDefault)
+                }
+                "requestDefaultDialer" -> {
+                    requestDefaultDialerRole()
+                    result.success(true)
+                }
+                "openAppSettings" -> {
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = android.net.Uri.fromParts("package", packageName, null)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "answerCall" -> {
+                    AppInCallService.answerCall()
+                    result.success(true)
+                }
+                "rejectCall" -> {
+                    AppInCallService.rejectCall()
+                    result.success(true)
+                }
+                "hangUp" -> {
+                    AppInCallService.hangUp()
+                    result.success(true)
+                }
+                "setMuted" -> {
+                    val muted = call.argument<Boolean>("muted") ?: false
+                    AppInCallService.activeCall?.let {
+                        // handled inside AppInCallService
+                    }
+                    result.success(true)
+                }
+                "setSpeaker" -> {
+                    val speakerOn = call.argument<Boolean>("speakerOn") ?: false
+                    // handled inside AppInCallService
+                    result.success(true)
+                }
+                "getSystemCallLogs" -> {
+                    val callLogManager = CallLogManager(this)
+                    val logs = callLogManager.getSystemCallLogs(100)
+                    result.success(logs)
+                }
                 "getInitialAction" -> {
                     val action = pendingInitialAction ?: intent?.getStringExtra("action") ?: ""
                     pendingInitialAction = null
@@ -146,6 +195,21 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // Call State Stream Channel
+        io.flutter.plugin.common.EventChannel(flutterEngine.dartExecutor.binaryMessenger, "com.speedcall.app/call_state")
+            .setStreamHandler(object : io.flutter.plugin.common.EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: io.flutter.plugin.common.EventChannel.EventSink?) {
+                    AppInCallService.listener = object : AppInCallService.CallStateListener {
+                        override fun onCallStateChanged(stateMap: Map<String, Any?>) {
+                            events?.success(stateMap)
+                        }
+                    }
+                }
+                override fun onCancel(arguments: Any?) {
+                    AppInCallService.listener = null
+                }
+            })
 
         // SIM Info Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SIM_INFO_CHANNEL).setMethodCallHandler { call, result ->
@@ -406,6 +470,29 @@ class MainActivity : FlutterActivity() {
 
         } catch (e: Exception) {
             result.success("")
+        }
+    }
+
+    private fun requestDefaultDialerRole() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(Context.ROLE_SERVICE) as? android.app.role.RoleManager
+            if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER)) {
+                val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER)
+                try {
+                    startActivityForResult(intent, 1088)
+                    return
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        try {
+            val intent = Intent(android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
+                putExtra(android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
